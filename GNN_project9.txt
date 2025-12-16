@@ -1,0 +1,7 @@
+GNN_project9
+・GAP感度（1回測定）から最終閾値（HFA感度）を推定
+
+TOP Strategy版
+・ノード特徴量5D: [NormX, NormY, GAP感度, Ecc, Angle]エッジ特徴量5D5D
+・感度比率の計算GAP感度を使用
+・重要度指標4指標
