@@ -1,5 +1,12 @@
-
+■GNN(1)について
 GNNで視野計測点の視野感度を予測して、importancemapを作成するシステム
+以後、このシステムをGNN(1)とする。
+
+GNN(1)は視野検査において、視野計測座標(54〜76点)のうち、重要度が高い点(周囲からの感度を予測することが難しい点)を算出する。
+
+GNN(1)を応用して、
+重要度が高い点を上位で選定して、その点を従来通り測定して、その測定した感度から周辺(重要度が低い＝周囲からの感度から予測しやすい点)を
+GNN等のアルゴリズムで予測して、提示感度とすることで計測時間の省略をすることができる。
 
 ■importanceについて
 
@@ -20,7 +27,7 @@ importanceの点数は下記のとおり
 
 
 
-■下記の順番で実行すると、importancemap作成
+■GNN(1)を下記の順番で実行すると、importancemap作成する
 
 ステップ1: グラフデータを作成（マリオット盲点情報）
 bashpython create_graph_by_eye_pattern.py
@@ -38,5 +45,6 @@ bashpython visualize_importance_by_eye_pattern.py
 
 
 ■一括でimportancemap作成
+
 
 run_importance_analysis_by_eye_pattern.py
