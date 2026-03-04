@@ -48,5 +48,30 @@ python visualize_importance_top_strategy.py
 上記ステップ1〜4をまとめて実行する場合：
 run_top_strategy_analysis.py
 
+■出力ディレクトリ構成
+{プロジェクトルート}/
+├── data/
+│   └── by_eye_pattern_top_angle60/       # グラフデータ（角度閾値で命名）
+│       ├── graph_data_Left_Pattern30-2.pkl
+│       ├── graph_data_Right_Pattern30-2.pkl
+│       ├── graph_data_Left_Pattern24-2.pkl
+│       └── angular_params.txt
+├── models/
+│   └── top_strategy_angle60/             # 訓練済みモデル
+│       ├── best_model_Left_Pattern30-2.pt
+│       └── ...
+├── results/
+│   └── top_strategy_angle60/             # 重要度スコア・訓練結果
+│       ├── analysis_summary_Left_Pattern30-2.csv
+│       ├── importance_map_Left_Pattern30-2.pkl
+│       ├── training_results_top_strategy.csv
+│       └── analysis_summary.txt
+└── visualizations/
+    └── importance_top_angle60_{timestamp}/  # 可視化画像
+        ├── combined_score_Left_Pattern30-2.png
+        ├── importance_map_Left_Pattern30-2.png
+        ├── comparison_Pattern30-2.png
+        └── analysis_summary.txt
+
 
 
