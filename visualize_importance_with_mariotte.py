@@ -2,8 +2,17 @@
 """
 visualize_importance_with_mariotte.py
 重要度マップ可視化（マリオット盲点位置を正しく表示）
+
+使用例:
+  python visualize_importance_with_mariotte.py
+  python visualize_importance_with_mariotte.py --data-suffix _angle45
+  python visualize_importance_with_mariotte.py --data-suffix _angle60
 """
 
+import os
+os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
+
+import argparse
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -14,21 +23,18 @@ import pickle
 from datetime import datetime
 import warnings
 warnings.filterwarnings('ignore')
-import japanize_matplotlib
 
-# 日本語フォント設定
+# 日本語フォント設定（japanize_matplotlibがなくても動作する）
+try:
+    import japanize_matplotlib
+except ImportError:
+    pass
+
 plt.rcParams['font.family'] = ['DejaVu Sans', 'sans-serif']
-
-TIMESTAMP = datetime.now().strftime("%Y%m%d_%H%M%S")
 
 # パス設定
 SCRIPT_DIR = Path(__file__).parent
 GNN_PROJECT_PATH = SCRIPT_DIR
-
-# TOP Strategy用
-INPUT_PATH_TOP = GNN_PROJECT_PATH / "results" / "top_strategy"
-OUTPUT_PATH = GNN_PROJECT_PATH / "visualizations" / f"importance_{TIMESTAMP}"
-OUTPUT_PATH.mkdir(parents=True, exist_ok=True)
 
 REDUCTION_RATIO = 0.5
 
@@ -56,15 +62,12 @@ def draw_mariotte_indicator(ax, eye_side, pattern_name):
     
     mx, my = get_mariotte_position(eye_side)
     
-    # マリオット盲点の位置にマーカーを追加
-    # 灰色の円で表示
     circle = Circle((mx, 0), radius=2, facecolor='gray', edgecolor='black', 
                     alpha=0.5, linewidth=1.5, zorder=10)
     ax.add_patch(circle)
     
-    # ラベル
     eye_name = "Left" if eye_side == 0 else "Right"
-    side_name = "右側(鼻側)" if eye_side == 0 else "左側(鼻側)"
+    side_name = "耳側(左)" if eye_side == 0 else "耳側(右)"
     ax.annotate(f'Mariotte\n({side_name})', xy=(mx, 0), xytext=(mx, -8),
                 fontsize=8, ha='center', va='top',
                 arrowprops=dict(arrowstyle='->', color='gray', lw=1),
@@ -72,11 +75,10 @@ def draw_mariotte_indicator(ax, eye_side, pattern_name):
 
 
 def create_importance_visualization(pattern_name, importance_dict, output_path):
-    """重要度マップの可視化（マリオット盲点位置を正しく表示）"""
+    """重要度マップの可視化（Combined + 4指標を1枚に統合、マリオット盲点付き）"""
     positions = importance_dict['positions']
     combined = importance_dict.get('combined', np.zeros(len(positions)))
     
-    # 新しい4指標を取得（あれば）
     pred_std = importance_dict.get('pred_std_normalized', np.zeros(len(positions)))
     pred_error = importance_dict.get('prediction_error_normalized', np.zeros(len(positions)))
     gnn_correction = importance_dict.get('gnn_correction_normalized', np.zeros(len(positions)))
@@ -89,171 +91,160 @@ def create_importance_visualization(pattern_name, importance_dict, output_path):
     
     n_total = len(positions)
     
-    # eye_side判定
     if 'Left' in pattern_name:
         eye_side = 0
     elif 'Right' in pattern_name:
         eye_side = 1
     else:
-        eye_side = 0  # デフォルト
+        eye_side = 0
     
     eye_name = "Left Eye" if eye_side == 0 else "Right Eye"
     pattern_type = pattern_name.replace('Left_', '').replace('Right_', '')
     
-    # 軸範囲
     if 'Pattern10-2' in pattern_name or '10-2' in pattern_name:
         axis_range = 12
     else:
         axis_range = 32
     
-    # 単体図（Combined Importanceのみ、マリオット盲点表示付き）
-    fig, ax = plt.subplots(figsize=(10, 10))
+    # === 統合図: Combined（上段中央・大） + 4指標（下段2x2） ===
+    fig = plt.figure(figsize=(20, 22))
     
-    scatter = ax.scatter(positions[:, 0], positions[:, 1], c=combined, 
-                        s=200, cmap='RdYlGn_r', vmin=0, vmax=10, edgecolors='black', linewidth=0.5)
+    # --- 上段: Combined Score（中央に大きく配置） ---
+    ax_combined = fig.add_axes([0.2, 0.55, 0.6, 0.38])  # [left, bottom, width, height]
     
-    ax.set_xlim(-axis_range, axis_range)
-    ax.set_ylim(-axis_range, axis_range)
-    ax.set_xlabel('X (degrees)', fontsize=14)
-    ax.set_ylabel('Y (degrees)', fontsize=14)
-    ax.set_title(f'{eye_name} - {pattern_type}\n({n_total} points)', fontsize=16)
-    ax.set_aspect('equal')
-    ax.axhline(y=0, color='gray', linestyle='--', alpha=0.3)
-    ax.axvline(x=0, color='gray', linestyle='--', alpha=0.3)
+    scatter = ax_combined.scatter(positions[:, 0], positions[:, 1], c=combined,
+                                  s=250, cmap='RdYlGn_r', vmin=0, vmax=10,
+                                  edgecolors='black', linewidth=0.5)
+    ax_combined.set_xlim(-axis_range, axis_range)
+    ax_combined.set_ylim(-axis_range, axis_range)
+    ax_combined.set_xlabel('X (degrees)', fontsize=13)
+    ax_combined.set_ylabel('Y (degrees)', fontsize=13)
+    ax_combined.set_title(f'Combined Importance Score\n({n_total} points)', fontsize=15, fontweight='bold')
+    ax_combined.set_aspect('equal')
+    ax_combined.axhline(y=0, color='gray', linestyle='--', alpha=0.3)
+    ax_combined.axvline(x=0, color='gray', linestyle='--', alpha=0.3)
+    ax_combined.grid(True, alpha=0.15)
+    draw_mariotte_indicator(ax_combined, eye_side, pattern_name)
+    cbar = plt.colorbar(scatter, ax=ax_combined, shrink=0.8, pad=0.02)
+    cbar.set_label('Importance (0-10)', fontsize=11)
     
-    # マリオット盲点インジケーター
-    draw_mariotte_indicator(ax, eye_side, pattern_name)
+    # --- 下段: 4指標（2x2） ---
+    metrics = [
+        (pred_std, 'Purples', '1. Prediction Uncertainty (pred_std)',
+         'Higher = needs more measurements', 'Uncertainty'),
+        (pred_error, 'Reds', '2. Prediction Error',
+         'Higher = harder to estimate alone', 'Error'),
+        (gnn_correction, 'Blues', '3. GNN Correction Amount',
+         'Higher = neighbor info is useful', 'Correction'),
+        (leave_one_out, 'Greens', '4. Leave-One-Out Influence',
+         'Higher = important info source', 'Influence'),
+    ]
     
-    plt.colorbar(scatter, ax=ax, label='Combined Importance', shrink=0.8)
+    panel_positions = [
+        [0.03, 0.03, 0.23, 0.42],   # 左下
+        [0.27, 0.03, 0.23, 0.42],   # 中左下
+        [0.51, 0.03, 0.23, 0.42],   # 中右下
+        [0.75, 0.03, 0.23, 0.42],   # 右下
+    ]
     
-    plt.tight_layout()
-    output_file = output_path / f"importance_{pattern_name}.png"
-    plt.savefig(output_file, dpi=150, bbox_inches='tight')
+    for (values, cmap, title, subtitle, cbar_label), pos in zip(metrics, panel_positions):
+        ax = fig.add_axes(pos)
+        sc = ax.scatter(positions[:, 0], positions[:, 1], c=values,
+                       s=80, cmap=cmap, vmin=0, vmax=10,
+                       edgecolors='black', linewidth=0.3)
+        ax.set_xlim(-axis_range, axis_range)
+        ax.set_ylim(-axis_range, axis_range)
+        ax.set_xlabel('X (degrees)', fontsize=9)
+        ax.set_ylabel('Y (degrees)', fontsize=9)
+        ax.set_title(f'{title}\n{subtitle}', fontsize=10)
+        ax.set_aspect('equal')
+        ax.axhline(y=0, color='gray', linestyle='--', alpha=0.3)
+        ax.axvline(x=0, color='gray', linestyle='--', alpha=0.3)
+        ax.grid(True, alpha=0.15)
+        ax.tick_params(labelsize=8)
+        draw_mariotte_indicator(ax, eye_side, pattern_name)
+        cb = plt.colorbar(sc, ax=ax, shrink=0.7, pad=0.02)
+        cb.set_label(cbar_label, fontsize=8)
+        cb.ax.tick_params(labelsize=7)
+    
+    fig.suptitle(f'{eye_name} - {pattern_type} (Combined + 4 Metrics + Mariotte)',
+                 fontsize=17, fontweight='bold', y=0.97)
+    
+    output_file = output_path / f"importance_mariotte_{pattern_name}.png"
+    plt.savefig(output_file, dpi=150, bbox_inches='tight', facecolor='white')
     plt.close()
     print(f"  ✓ Saved: {output_file.name}")
-    
-    # 4パネル図
-    fig, axes = plt.subplots(2, 2, figsize=(16, 14))
-    
-    # 1. pred_std (不確実性)
-    ax1 = axes[0, 0]
-    sc1 = ax1.scatter(positions[:, 0], positions[:, 1], c=pred_std, 
-                      s=150, cmap='Purples', vmin=0, vmax=10, edgecolors='black', linewidth=0.3)
-    ax1.set_xlim(-axis_range, axis_range)
-    ax1.set_ylim(-axis_range, axis_range)
-    ax1.set_xlabel('X (degrees)')
-    ax1.set_ylabel('Y (degrees)')
-    ax1.set_title('1. Prediction Uncertainty (pred_std)\nHigher = needs more measurements', fontsize=11)
-    ax1.set_aspect('equal')
-    ax1.axhline(y=0, color='gray', linestyle='--', alpha=0.3)
-    ax1.axvline(x=0, color='gray', linestyle='--', alpha=0.3)
-    draw_mariotte_indicator(ax1, eye_side, pattern_name)
-    plt.colorbar(sc1, ax=ax1)
-    
-    # 2. prediction_error (予測誤差)
-    ax2 = axes[0, 1]
-    sc2 = ax2.scatter(positions[:, 0], positions[:, 1], c=pred_error,
-                      s=150, cmap='Reds', vmin=0, vmax=10, edgecolors='black', linewidth=0.3)
-    ax2.set_xlim(-axis_range, axis_range)
-    ax2.set_ylim(-axis_range, axis_range)
-    ax2.set_xlabel('X (degrees)')
-    ax2.set_ylabel('Y (degrees)')
-    ax2.set_title('2. Prediction Error\nHigher = harder to estimate alone', fontsize=11)
-    ax2.set_aspect('equal')
-    ax2.axhline(y=0, color='gray', linestyle='--', alpha=0.3)
-    ax2.axvline(x=0, color='gray', linestyle='--', alpha=0.3)
-    draw_mariotte_indicator(ax2, eye_side, pattern_name)
-    plt.colorbar(sc2, ax=ax2)
-    
-    # 3. gnn_correction (GNN補正量)
-    ax3 = axes[1, 0]
-    sc3 = ax3.scatter(positions[:, 0], positions[:, 1], c=gnn_correction,
-                      s=150, cmap='Blues', vmin=0, vmax=10, edgecolors='black', linewidth=0.3)
-    ax3.set_xlim(-axis_range, axis_range)
-    ax3.set_ylim(-axis_range, axis_range)
-    ax3.set_xlabel('X (degrees)')
-    ax3.set_ylabel('Y (degrees)')
-    ax3.set_title('3. GNN Correction Amount\nHigher = neighbor info is useful', fontsize=11)
-    ax3.set_aspect('equal')
-    ax3.axhline(y=0, color='gray', linestyle='--', alpha=0.3)
-    ax3.axvline(x=0, color='gray', linestyle='--', alpha=0.3)
-    draw_mariotte_indicator(ax3, eye_side, pattern_name)
-    plt.colorbar(sc3, ax=ax3)
-    
-    # 4. leave_one_out (除外影響度)
-    ax4 = axes[1, 1]
-    sc4 = ax4.scatter(positions[:, 0], positions[:, 1], c=leave_one_out,
-                      s=150, cmap='Greens', vmin=0, vmax=10, edgecolors='black', linewidth=0.3)
-    ax4.set_xlim(-axis_range, axis_range)
-    ax4.set_ylim(-axis_range, axis_range)
-    ax4.set_xlabel('X (degrees)')
-    ax4.set_ylabel('Y (degrees)')
-    ax4.set_title('4. Leave-One-Out Influence\nHigher = important info source', fontsize=11)
-    ax4.set_aspect('equal')
-    ax4.axhline(y=0, color='gray', linestyle='--', alpha=0.3)
-    ax4.axvline(x=0, color='gray', linestyle='--', alpha=0.3)
-    draw_mariotte_indicator(ax4, eye_side, pattern_name)
-    plt.colorbar(sc4, ax=ax4)
-    
-    fig.suptitle(f'{eye_name} - {pattern_type} (4 Metrics)', fontsize=14, y=1.02)
-    plt.tight_layout()
-    
-    output_file2 = output_path / f"importance_4metrics_{pattern_name}.png"
-    plt.savefig(output_file2, dpi=150, bbox_inches='tight')
-    plt.close()
-    print(f"  ✓ Saved: {output_file2.name}")
 
 
 def verify_mariotte_exclusion(pattern_name, positions):
     """マリオット盲点が正しく除外されているか確認"""
     if 'Left' in pattern_name:
         eye_side = 0
-        mariotte_x = 15
+        mariotte_positions = [(-15, 3), (-15, -3)]
     else:
         eye_side = 1
-        mariotte_x = -15
+        mariotte_positions = [(15, 3), (15, -3)]
     
-    # y=±3でマリオット盲点位置の点があるか確認
-    for y in [3, -3]:
-        points_at_y = positions[np.abs(positions[:, 1] - y) < 0.5]
-        has_mariotte = any(np.abs(points_at_y[:, 0] - mariotte_x) < 0.5)
-        
-        expected = "should NOT exist" if 'Pattern10-2' not in pattern_name else "N/A"
-        status = "EXCLUDED" if not has_mariotte else "EXISTS"
+    for mx, my in mariotte_positions:
+        points_near = positions[
+            (np.abs(positions[:, 0] - mx) < 1.0) & 
+            (np.abs(positions[:, 1] - my) < 1.0)
+        ]
+        status = "EXCLUDED ✓" if len(points_near) == 0 else "EXISTS ✗"
         
         if 'Pattern10-2' not in pattern_name:
-            print(f"    ({mariotte_x}, {y}): {status} ({expected})")
+            print(f"    ({mx}, {my}): {status}")
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description='重要度マップ可視化（マリオット盲点位置を正しく表示）'
+    )
+    parser.add_argument('--data-suffix', '-d', type=str, default='',
+                        help='データディレクトリのサフィックス (例: _angle45)')
+    return parser.parse_args()
 
 
 if __name__ == "__main__":
-    print("="*70)
+    args = parse_args()
+    
+    TIMESTAMP = datetime.now().strftime("%Y%m%d_%H%M%S")
+    
+    # パス設定（★サフィックス対応）
+    INPUT_PATH = GNN_PROJECT_PATH / "results" / f"top_strategy{args.data_suffix}"
+    OUTPUT_PATH = GNN_PROJECT_PATH / "visualizations" / f"importance_mariotte{args.data_suffix}_{TIMESTAMP}"
+    OUTPUT_PATH.mkdir(parents=True, exist_ok=True)
+    
+    print("=" * 70)
     print("Visualizing Importance Maps with Correct Mariotte Position")
-    print("="*70)
+    print("=" * 70)
+    print(f"\nInput path: {INPUT_PATH}")
+    print(f"Output path: {OUTPUT_PATH}")
     
     print("\nMariotte Blind Spot Positions (Anatomical Facts):")
-    print("  Left Eye:  (+15, ±3) - Right side (nasal)")
-    print("  Right Eye: (-15, ±3) - Left side (nasal)")
+    print("  Left Eye:  (-15, ±3) - Left side (temporal)")
+    print("  Right Eye: (+15, ±3) - Right side (temporal)")
     
-    # TOP Strategy結果を探す
-    importance_files = list(INPUT_PATH_TOP.glob("importance_map_*.pkl"))
+    # 重要度マップファイル検索
+    importance_files = list(INPUT_PATH.glob("importance_map_*.pkl"))
     
     if len(importance_files) == 0:
-        print(f"\nNo data found in {INPUT_PATH_TOP}")
-        print("Trying alternative paths...")
+        print(f"\nNo data found in {INPUT_PATH}")
         
-        # 代替パス
+        # サフィックスなしのパスも試す
         alt_paths = [
+            GNN_PROJECT_PATH / "results" / "top_strategy",
             GNN_PROJECT_PATH / "results" / "importance_maps_top",
-            GNN_PROJECT_PATH / "results" / "by_eye_pattern_angular",
         ]
         for alt_path in alt_paths:
             importance_files = list(alt_path.glob("importance_map_*.pkl"))
             if importance_files:
+                INPUT_PATH = alt_path
                 print(f"Found data in {alt_path}")
                 break
     
     if len(importance_files) == 0:
-        print("No importance map files found. Please run compute_importance first.")
+        print("No importance map files found. Please run compute_importance_top_strategy.py first.")
         exit(1)
     
     print(f"\nFound {len(importance_files)} importance maps")
@@ -269,15 +260,13 @@ if __name__ == "__main__":
         positions = importance_dict['positions']
         print(f"  Points: {len(positions)}")
         
-        # マリオット盲点除外の確認
         if 'Pattern10-2' not in pattern_name:
             print("  Mariotte exclusion check:")
             verify_mariotte_exclusion(pattern_name, positions)
         
-        # 可視化
         create_importance_visualization(pattern_name, importance_dict, OUTPUT_PATH)
     
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print("Completed!")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
     print(f"Output: {OUTPUT_PATH}")
