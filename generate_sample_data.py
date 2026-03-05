@@ -494,7 +494,7 @@ def parse_args():
     
     parser.add_argument('--output-dir', '-o', type=str, 
                         default='./sample_data/GAP_Clinical',
-                        help='出力ディレクトリ。デフォルト: ./sample_data/GAP2_KyodaiClinical')
+                        help='出力ディレクトリ。デフォルト: ./sample_data/GAP_Clinical')
     
     parser.add_argument('--n-subjects', '-n', type=int, default=100,
                         help='被験者数。デフォルト: 100')
