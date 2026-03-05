@@ -88,7 +88,7 @@ def check_prerequisites(args):
     
     # データパス
     print("1. Checking data availability...")
-    data_path = Path("G:/共有ドライブ/GAP_Analysis/Data/GAP_Clinical")
+    data_path = Path("C:\project\GNN_G\sample_data\GAP_Clinical")
     
     if data_path.exists():
         folders = list(data_path.glob("*/HFAMatchData"))
@@ -407,3 +407,4 @@ if __name__ == "__main__":
         traceback.print_exc()
 
         sys.exit(1)
+
