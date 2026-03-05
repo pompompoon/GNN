@@ -86,7 +86,7 @@ SCRIPT_DIR = Path(__file__).parent
 GNN_PROJECT_PATH = SCRIPT_DIR
 
 # データパス
-DATA_ROOT = Path("G:/共有ドライブ/GAP_Analysis/Data/GAP2_KyodaiClinical")
+DATA_ROOT = Path("C:\project\GNN_G\sample_data\GAP_Clinical")
 
 
 # ==================== 標準グリッド定義 ====================
@@ -887,4 +887,5 @@ if __name__ == "__main__":
     print("  - HFA Sensitivity (gold standard)")
     print("="*70)
     
+
     process_all_subjects(args)
